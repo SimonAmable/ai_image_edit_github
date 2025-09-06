@@ -1,9 +1,15 @@
 import { createClient } from "@/app/utils/supabase/server"
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
     try {
-        const supabase = await createClient()
+        // Use service role for server-side uploads to bypass RLS
+        const supabase = createServiceClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        )
+        
         const formData = await request.formData()
         const file = formData.get("file") as File
 
