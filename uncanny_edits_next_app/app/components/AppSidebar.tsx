@@ -18,12 +18,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-import {  Sparkles, Wand2, Camera, Brush,Folder, DollarSign, Home, Compass, User, Zap, Gem } from 'lucide-react'
-import Image from "next/image"
+import { Home, User, Zap, Gem, Mic } from 'lucide-react'
 import { NavUser } from "./UserSidebarNav"
 import Link from "next/link"
-
-import { createClient } from '@/app/utils/supabase/server'
 import { ModeToggle } from "./ModeToggle"
 import FeedbackSidebarItem from "./FeedbackSidebarItem"
 
@@ -49,6 +46,13 @@ const sidebarMenuItems = [
     icon: Gem,
     description: "View and manage your pricing",
     href: "/pricing"
+  },
+  {
+    id: "speech-to-text",
+    title: "Speech to Text",
+    icon: Mic,
+    description: "Convert speech to text using AI",
+    href: "/speech-to-text"
   },
   // {
   //   id: "enhance",
