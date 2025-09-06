@@ -7,6 +7,19 @@ import { Copy, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import HybridMicrophoneButton from './HybridMicrophoneButton';
 
+// Type definition for Speech Recognition
+interface SpeechRecognitionConstructor {
+  new (): SpeechRecognition;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+}
+
 export default function SpeechToText() {
   const [interimText, setInterimText] = useState('');
   const [isSupported, setIsSupported] = useState(false);
@@ -17,7 +30,12 @@ export default function SpeechToText() {
   useEffect(() => {
     setIsClient(true);
 
-    const hasSpeechRecognition = !!(window as any).SpeechRecognition || !!(window as any).webkitSpeechRecognition;
+    const windowWithSpeech = window as Window & {
+      SpeechRecognition?: SpeechRecognitionConstructor;
+      webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    };
+    
+    const hasSpeechRecognition = !!(windowWithSpeech.SpeechRecognition || windowWithSpeech.webkitSpeechRecognition);
     const isSecureContext = window.isSecureContext;
 
     setIsSupported(hasSpeechRecognition && isSecureContext);

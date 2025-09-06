@@ -4,6 +4,54 @@ import { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+// Type definitions for Speech Recognition API
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+  message: string;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  0: {
+    transcript: string;
+    confidence: number;
+  };
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionConstructor {
+  new (): SpeechRecognition;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: ((this: SpeechRecognition, ev: Event) => void) | null;
+  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void) | null;
+  onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => void) | null;
+  onend: ((this: SpeechRecognition, ev: Event) => void) | null;
+  start(): void;
+  stop(): void;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
+
 interface HybridMicrophoneButtonProps {
     onLiveTranscription: (text: string, isFinal: boolean) => void;
     onGroqTranscription: (text: string, segmentId: string) => void;
@@ -19,14 +67,14 @@ export default function HybridMicrophoneButton({
     const [isProcessing, setIsProcessing] = useState(false);
     const [isSupported, setIsSupported] = useState(false);
 
-    const recognitionRef = useRef<any>(null);
+    const recognitionRef = useRef<SpeechRecognition | null>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
     const segmentCounterRef = useRef(0);
 
     useEffect(() => {
         // Check if browser supports both APIs
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const hasMediaRecorder = !!window.MediaRecorder;
         const hasMediaDevices = !!navigator?.mediaDevices?.getUserMedia;
 
@@ -34,7 +82,7 @@ export default function HybridMicrophoneButton({
     }, []);
 
     const startListening = async () => {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
         if (!SpeechRecognition) {
             onError('Speech recognition not supported in this browser');
@@ -117,7 +165,7 @@ export default function HybridMicrophoneButton({
                 mediaRecorder.start(); // Start recording for Groq
             };
 
-            recognition.onresult = (event: any) => {
+            recognition.onresult = (event: SpeechRecognitionEvent) => {
                 let interimTranscript = '';
                 let finalTranscript = '';
 
@@ -140,7 +188,7 @@ export default function HybridMicrophoneButton({
                 }
             };
 
-            recognition.onerror = (event: any) => {
+            recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
                 console.error('Speech recognition error:', event.error);
                 setIsListening(false);
 
@@ -168,11 +216,12 @@ export default function HybridMicrophoneButton({
             };
 
             recognition.start();
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Failed to start hybrid recording:', error);
-            if (error.name === 'NotAllowedError') {
+            const errorWithName = error as { name?: string };
+            if (errorWithName.name === 'NotAllowedError') {
                 onError('Microphone access denied. Please allow microphone access and try again.');
-            } else if (error.name === 'NotFoundError') {
+            } else if (errorWithName.name === 'NotFoundError') {
                 onError('No microphone found. Please connect a microphone and try again.');
             } else {
                 onError('Failed to start recording. Please check your microphone settings.');
