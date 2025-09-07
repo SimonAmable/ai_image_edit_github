@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     // Save images - ensure user_id is set for each image
     if (images && images.length > 0) {
       const { error: imagesError } = await supabase.from("canvas_images").insert(
-        images.map((img: any) => ({
+        images.map((img: { url: string; filename: string; x: number; y: number; width: number; height: number }) => ({
           canvas_id: canvas.id,
           user_id: user.id, // Ensure image belongs to authenticated user
           image_url: img.url,

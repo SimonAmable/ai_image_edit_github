@@ -69,8 +69,10 @@ export function MaskTool({ imageUrl, imageWidth, imageHeight, onMaskComplete, on
         }
 
         // Initial overlay draw to ensure image is visible - inline the logic
-        ctx.clearRect(0, 0, canvas.width, canvas.height)
-        ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
+        if (ctx) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height)
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
+        }
     }, [image])
 
     // Draw mask overlay

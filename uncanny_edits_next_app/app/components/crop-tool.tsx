@@ -153,7 +153,7 @@ export function CropTool({ imageUrl, imageWidth, imageHeight, onCropComplete, on
                 const formData = new FormData()
                 formData.append("file", blob, `cropped-${Date.now()}.png`)
 
-                const result = await apiUpload("/api/upload", formData)
+                const result = await apiUpload("/api/upload", formData) as { url: string }
 
                 // Return the cropped image data
                 onCropComplete({

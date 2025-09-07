@@ -40,7 +40,7 @@ export function CanvasManager({ onSave, onLoad, onNew }: CanvasManagerProps) {
     const loadCanvases = async () => {
         try {
             console.log("Loading canvases...")
-            const data = await api.get("/api/canvas/list")
+            const data = await api.get<{ canvases: Canvas[] }>("/api/canvas/list")
             console.log("Response data:", data)
             if (data.canvases) {
                 setCanvases(data.canvases)
