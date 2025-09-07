@@ -18,7 +18,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-import { Home, User, Zap, Gem, Mic } from 'lucide-react'
+import { Home, User, Zap, Gem, Mic, Wand2 } from 'lucide-react'
 import { NavUser } from "./UserSidebarNav"
 import Link from "next/link"
 import { ModeToggle } from "./ModeToggle"
@@ -46,6 +46,14 @@ const sidebarMenuItems = [
     icon: Gem,
     description: "View and manage your pricing",
     href: "/pricing"
+  },
+  // create
+  {
+    id: "create",
+    title: "Create",
+    icon: Wand2,
+    description: "Create images using AI",
+    href: "/create"
   },
   {
     id: "speech-to-text",
