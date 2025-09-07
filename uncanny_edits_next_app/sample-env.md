@@ -36,3 +36,6 @@ OAUTH_GOOGLE_CLIENT_SECRET=
 # Feedback email and resend
 FEEDBACK_EMAIL_TO=
 RESEND_API_KEY=
+
+# Waitlist email (optional - defaults to FEEDBACK_EMAIL_TO if not set)
+WAITLIST_ADMIN_EMAIL=

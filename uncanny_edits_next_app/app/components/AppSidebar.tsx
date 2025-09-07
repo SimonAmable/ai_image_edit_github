@@ -93,7 +93,7 @@ async function LogoTitle() {
 export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Remove Supabase user/profile fetching logic
   return (
-    <Sidebar variant="sidebar" collapsible="icon" {...props} >
+    <Sidebar variant="sidebar" collapsible="offcanvas" {...props} >
       <SidebarHeader>
         <LogoTitle />
       </SidebarHeader>
