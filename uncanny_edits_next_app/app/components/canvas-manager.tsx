@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/app/components/ui/button"
 import { Input } from "@/app/components/ui/input"
+import { api } from "@/app/utils/api-client"
 // Simple modal components
 const Modal = ({ isOpen, onClose, children }: { isOpen: boolean; onClose: () => void; children: React.ReactNode }) => {
     if (!isOpen) return null
@@ -39,9 +40,7 @@ export function CanvasManager({ onSave, onLoad, onNew }: CanvasManagerProps) {
     const loadCanvases = async () => {
         try {
             console.log("Loading canvases...")
-            const response = await fetch("/api/canvas/list")
-            console.log("Response status:", response.status)
-            const data = await response.json()
+            const data = await api.get("/api/canvas/list")
             console.log("Response data:", data)
             if (data.canvases) {
                 setCanvases(data.canvases)
