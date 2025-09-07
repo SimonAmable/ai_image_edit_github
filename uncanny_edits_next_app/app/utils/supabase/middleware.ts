@@ -37,15 +37,44 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/auth')
-  ) {
-    // no user, potentially respond by redirecting the user to the login page
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
+  console.log("Middleware - auth check:", { 
+    path: request.nextUrl.pathname,
+    hasUser: !!user,
+    userId: user?.id,
+    isApiRoute: request.nextUrl.pathname.startsWith('/api/')
+  })
+
+  // Define public routes that don't require authentication
+  const publicRoutes = ['/login', '/signup', '/auth', '/', '/waitlist', '/pricing', '/privacy', '/tos']
+  const isPublicRoute = publicRoutes.some(route => 
+    request.nextUrl.pathname === route || 
+    request.nextUrl.pathname.startsWith(route + '/')
+  )
+
+  // Define public API routes that don't require authentication
+  const publicApiRoutes = ['/api/waitlist', '/api/subscription-plans']
+  const isPublicApiRoute = publicApiRoutes.some(route => 
+    request.nextUrl.pathname.startsWith(route)
+  )
+
+  // Check if user is authenticated
+  if (!user) {
+    // For API routes, return 401 instead of redirecting (except public API routes)
+    if (request.nextUrl.pathname.startsWith('/api/')) {
+      if (isPublicApiRoute) {
+        // Allow public API routes
+        return supabaseResponse
+      }
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
+    // For page routes, redirect to login (except public routes)
+    if (!isPublicRoute) {
+      console.log("Middleware - redirecting to login for path:", request.nextUrl.pathname)
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      return NextResponse.redirect(url)
+    }
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is.
