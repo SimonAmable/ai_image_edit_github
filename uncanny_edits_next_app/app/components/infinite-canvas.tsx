@@ -101,22 +101,96 @@ export function InfiniteCanvas() {
     const [showRestoreNotification, setShowRestoreNotification] = useState(false)
 
     const handlePencilClick = useCallback(() => {
-        if (selectedImageId) {
-            // If image is selected, enable drawing on image
-            setIsDrawingOnImage(true)
-            setIsDrawingMode(true)
-        } else {
-            // If no image selected, open drawing modal
-            setIsDrawingModalOpen(true)
-        }
-    }, [selectedImageId])
+        // Always open drawing modal, whether image is selected or not
+        setIsDrawingModalOpen(true)
+    }, [])
 
     const handleDrawingModalSave = useCallback(
         (imageData: { url: string; filename: string; width: number; height: number }) => {
-            handleImageUploaded(imageData)
+            const selectedImage = images.find((img) => img.selected)
+
+            if (selectedImage) {
+                // If editing an existing image, replace it (like crop tool)
+                const drawnImage: CanvasImage = {
+                    ...selectedImage,
+                    id: Date.now().toString(),
+                    url: imageData.url,
+                    filename: `drawn-${selectedImage.filename}`,
+                    width: imageData.width,
+                    height: imageData.height,
+                    originalWidth: imageData.width,
+                    originalHeight: imageData.height,
+                    selected: true,
+                }
+
+                // Remove the original image and add the drawn one
+                setImages((prev) => [
+                    ...prev.filter(img => img.id !== selectedImage.id),
+                    drawnImage
+                ])
+
+                // Initialize edit history for new image
+                setEditHistory((prev) => ({
+                    ...prev,
+                    [drawnImage.id]: [],
+                }))
+
+                // Load the drawn image for rendering
+                const img = new Image()
+                img.crossOrigin = "anonymous"
+                img.onload = () => {
+                    setLoadedImages((prev) => new Map(prev).set(imageData.url, img))
+                }
+                img.src = imageData.url
+            } else {
+                // If no image selected, add as new image (inline the handleImageUploaded logic)
+                const canvas = canvasRef.current
+                if (!canvas) return
+
+                // Calculate center position on canvas
+                const rect = canvas.getBoundingClientRect()
+                const centerX = (rect.width / 2 - canvasState.offsetX) / canvasState.scale
+                const centerY = (rect.height / 2 - canvasState.offsetY) / canvasState.scale
+
+                // Scale image to reasonable size (max 400px)
+                const maxSize = 400
+                const scale = Math.min(maxSize / imageData.width, maxSize / imageData.height, 1)
+                const scaledWidth = imageData.width * scale
+                const scaledHeight = imageData.height * scale
+
+                const newImage: CanvasImage = {
+                    id: Date.now().toString(),
+                    url: imageData.url,
+                    filename: imageData.filename,
+                    x: centerX - scaledWidth / 2,
+                    y: centerY - scaledHeight / 2,
+                    width: scaledWidth,
+                    height: scaledHeight,
+                    originalWidth: imageData.width,
+                    originalHeight: imageData.height,
+                    selected: true,
+                }
+
+                // Deselect other images
+                setImages((prev) => [...prev.map((img) => ({ ...img, selected: false })), newImage])
+
+                setEditHistory((prev) => ({
+                    ...prev,
+                    [newImage.id]: [],
+                }))
+
+                // Load the image for rendering
+                const img = new Image()
+                img.crossOrigin = "anonymous"
+                img.onload = () => {
+                    setLoadedImages((prev) => new Map(prev).set(imageData.url, img))
+                }
+                img.src = imageData.url
+            }
+
             setIsDrawingModalOpen(false)
         },
-        [],
+        [images, canvasState],
     )
 
     // Handle crop tool
@@ -953,6 +1027,9 @@ export function InfiniteCanvas() {
                 isOpen={isDrawingModalOpen}
                 onClose={() => setIsDrawingModalOpen(false)}
                 onSave={handleDrawingModalSave}
+                existingImageUrl={selectedImageId ? images.find(img => img.id === selectedImageId)?.url : undefined}
+                existingImageWidth={selectedImageId ? images.find(img => img.id === selectedImageId)?.originalWidth : undefined}
+                existingImageHeight={selectedImageId ? images.find(img => img.id === selectedImageId)?.originalHeight : undefined}
             />
 
             {/* Crop Tool */}

@@ -9,9 +9,19 @@ interface DrawingModalProps {
     isOpen: boolean
     onClose: () => void
     onSave: (imageData: { url: string; filename: string; width: number; height: number }) => void
+    existingImageUrl?: string
+    existingImageWidth?: number
+    existingImageHeight?: number
 }
 
-export function DrawingModal({ isOpen, onClose, onSave }: DrawingModalProps) {
+export function DrawingModal({ 
+    isOpen, 
+    onClose, 
+    onSave, 
+    existingImageUrl, 
+    existingImageWidth, 
+    existingImageHeight 
+}: DrawingModalProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const [isDrawing, setIsDrawing] = useState(false)
     const [lastPoint, setLastPoint] = useState<{ x: number; y: number } | null>(null)
@@ -66,10 +76,24 @@ export function DrawingModal({ isOpen, onClose, onSave }: DrawingModalProps) {
         if (!canvas) return
 
         const ctx = canvas.getContext("2d")
-        if (ctx) {
+        if (!ctx) return
+
+        if (existingImageUrl && existingImageWidth && existingImageHeight) {
+            // If editing existing image, reload the original image
+            const img = new Image()
+            img.crossOrigin = "anonymous"
+            img.onload = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height)
+                ctx.drawImage(img, 0, 0, existingImageWidth, existingImageHeight)
+            }
+            img.src = existingImageUrl
+        } else {
+            // If new drawing, clear and fill with white
             ctx.clearRect(0, 0, canvas.width, canvas.height)
+            ctx.fillStyle = "#ffffff"
+            ctx.fillRect(0, 0, canvas.width, canvas.height)
         }
-    }, [])
+    }, [existingImageUrl, existingImageWidth, existingImageHeight])
 
     const saveDrawing = useCallback(async () => {
         const canvas = canvasRef.current
@@ -81,8 +105,9 @@ export function DrawingModal({ isOpen, onClose, onSave }: DrawingModalProps) {
 
             try {
                 // Upload to blob storage
+                const filename = existingImageUrl ? "edited-drawing.png" : "drawing.png"
                 const formData = new FormData()
-                formData.append("file", blob, "drawing.png")
+                formData.append("file", blob, filename)
 
                 const response = await fetch("/api/upload", {
                     method: "POST",
@@ -97,7 +122,7 @@ export function DrawingModal({ isOpen, onClose, onSave }: DrawingModalProps) {
 
                 onSave({
                     url: result.url,
-                    filename: "drawing.png",
+                    filename: filename,
                     width: canvas.width,
                     height: canvas.height,
                 })
@@ -116,23 +141,37 @@ export function DrawingModal({ isOpen, onClose, onSave }: DrawingModalProps) {
         const canvas = canvasRef.current
         if (!canvas) return
 
-        // Set canvas size
-        canvas.width = 800
-        canvas.height = 600
-
         const ctx = canvas.getContext("2d")
-        if (ctx) {
-            // Set drawing properties
-            ctx.strokeStyle = "#000000"
-            ctx.lineWidth = 2
-            ctx.lineCap = "round"
-            ctx.lineJoin = "round"
+        if (!ctx) return
+
+        // Set drawing properties
+        ctx.strokeStyle = "#000000"
+        ctx.lineWidth = 2
+        ctx.lineCap = "round"
+        ctx.lineJoin = "round"
+
+        if (existingImageUrl && existingImageWidth && existingImageHeight) {
+            // Set canvas size to match existing image
+            canvas.width = existingImageWidth
+            canvas.height = existingImageHeight
+
+            // Load and draw the existing image
+            const img = new Image()
+            img.crossOrigin = "anonymous"
+            img.onload = () => {
+                ctx.drawImage(img, 0, 0, existingImageWidth, existingImageHeight)
+            }
+            img.src = existingImageUrl
+        } else {
+            // Set default canvas size for new drawing
+            canvas.width = 800
+            canvas.height = 600
 
             // Fill with white background
             ctx.fillStyle = "#ffffff"
             ctx.fillRect(0, 0, canvas.width, canvas.height)
         }
-    }, [isOpen])
+    }, [isOpen, existingImageUrl, existingImageWidth, existingImageHeight])
 
     if (!isOpen) return null
 
@@ -140,7 +179,9 @@ export function DrawingModal({ isOpen, onClose, onSave }: DrawingModalProps) {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-background rounded-lg shadow-xl p-6 max-w-4xl w-full mx-4">
                 <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold">Drawing Canvas</h2>
+                    <h2 className="text-xl font-semibold">
+                        {existingImageUrl ? "Draw on Image" : "Drawing Canvas"}
+                    </h2>
                     <Button variant="ghost" size="sm" onClick={onClose}>
                         <X className="h-4 w-4" />
                     </Button>
