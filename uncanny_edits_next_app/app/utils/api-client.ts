@@ -7,7 +7,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public data?: any
+    public data?: unknown
   ) {
     super(message)
     this.name = 'ApiError'
@@ -36,7 +36,7 @@ export async function apiRequest(
   return response
 }
 
-export async function apiRequestJson<T = any>(
+export async function apiRequestJson<T = unknown>(
   url: string,
   options: RequestInit = {}
 ): Promise<T> {
@@ -56,24 +56,24 @@ export async function apiRequestJson<T = any>(
 
 // Convenience methods for common HTTP verbs
 export const api = {
-  get: <T = any>(url: string, options?: RequestInit) =>
+  get: <T = unknown>(url: string, options?: RequestInit) =>
     apiRequestJson<T>(url, { ...options, method: 'GET' }),
   
-  post: <T = any>(url: string, data?: any, options?: RequestInit) =>
+  post: <T = unknown>(url: string, data?: unknown, options?: RequestInit) =>
     apiRequestJson<T>(url, {
       ...options,
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
     }),
   
-  put: <T = any>(url: string, data?: any, options?: RequestInit) =>
+  put: <T = unknown>(url: string, data?: unknown, options?: RequestInit) =>
     apiRequestJson<T>(url, {
       ...options,
       method: 'PUT',
       body: data ? JSON.stringify(data) : undefined,
     }),
   
-  delete: <T = any>(url: string, options?: RequestInit) =>
+  delete: <T = unknown>(url: string, options?: RequestInit) =>
     apiRequestJson<T>(url, { ...options, method: 'DELETE' }),
 }
 
@@ -82,7 +82,7 @@ export async function apiUpload(
   url: string,
   formData: FormData,
   options: RequestInit = {}
-): Promise<any> {
+): Promise<unknown> {
   const response = await fetch(url, {
     ...options,
     method: 'POST',

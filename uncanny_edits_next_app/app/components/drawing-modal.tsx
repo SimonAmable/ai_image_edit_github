@@ -110,7 +110,7 @@ export function DrawingModal({
                 const formData = new FormData()
                 formData.append("file", blob, filename)
 
-                const result = await apiUpload("/api/upload", formData)
+                const result = await apiUpload("/api/upload", formData) as { url: string }
 
                 onSave({
                     url: result.url,
@@ -124,7 +124,7 @@ export function DrawingModal({
                 console.error("Failed to save drawing:", error)
             }
         }, "image/png")
-    }, [onSave, onClose])
+    }, [onSave, onClose, existingImageUrl])
 
     // Initialize canvas
     useEffect(() => {

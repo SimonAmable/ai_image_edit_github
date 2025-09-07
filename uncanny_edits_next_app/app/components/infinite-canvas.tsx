@@ -623,7 +623,13 @@ export function InfiniteCanvas() {
             try {
                 console.log("[v0] Edit request:", { prompt, tool, imageId: selectedImage.id })
 
-                const requestBody: any = {
+                const requestBody: {
+                    imageUrl: string;
+                    prompt: string;
+                    tool: "crop" | "mask" | "pencil" | null;
+                    drawingPaths?: Array<{ x: number; y: number }[]>;
+                    maskData?: string;
+                } = {
                     imageUrl: selectedImage.url,
                     prompt: prompt,
                     tool: tool,
@@ -639,7 +645,7 @@ export function InfiniteCanvas() {
                     requestBody.maskData = maskData
                 }
 
-                const result = await api.post("/api/edit-image", requestBody)
+                const result = await api.post<{ editedImageUrl?: string }>("/api/edit-image", requestBody)
 
                 if (result.editedImageUrl) {
                     // Create new image with edited URL
@@ -664,9 +670,9 @@ export function InfiniteCanvas() {
                     const img = new Image()
                     img.crossOrigin = "anonymous"
                     img.onload = () => {
-                        setLoadedImages((prev) => new Map(prev).set(result.editedImageUrl, img))
+                        setLoadedImages((prev) => new Map(prev).set(result.editedImageUrl!, img))
                     }
-                    img.src = result.editedImageUrl
+                    img.src = result.editedImageUrl!
                 }
 
                 setEditHistory((prev) => ({
@@ -713,7 +719,7 @@ export function InfiniteCanvas() {
                 setIsProcessingEdit(false)
             }
         },
-        [images, drawingPaths],
+        [images, drawingPaths, maskData],
     )
 
     const handleRevertToEdit = useCallback(
@@ -780,7 +786,7 @@ export function InfiniteCanvas() {
                 })
 
                 // Restore images
-                const restoredImages: CanvasImage[] = data.images.map((img: any) => ({
+                const restoredImages: CanvasImage[] = data.images.map((img: { url: string; filename: string; x: number; y: number; width: number; height: number }) => ({
                     id: Date.now().toString() + Math.random(),
                     url: img.url,
                     filename: img.filename,
