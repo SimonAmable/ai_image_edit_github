@@ -11,6 +11,8 @@ import { MaskTool } from "@/app/components/mask-tool"
 
 import { useRef, useEffect, useState, useCallback } from "react"
 import Link from "next/link"
+import { useCanvasCache } from "@/app/hooks/use-canvas-cache"
+import { CacheRestoreNotification } from "@/app/components/cache-restore-notification"
 
 interface CanvasState {
     scale: number
@@ -93,6 +95,10 @@ export function InfiniteCanvas() {
 
     // State for cursor management
     const [isHoveringImage, setIsHoveringImage] = useState(false)
+
+    // Canvas caching
+    const { saveToCache, loadFromCache, clearCache, hasCachedData } = useCanvasCache()
+    const [showRestoreNotification, setShowRestoreNotification] = useState(false)
 
     const handlePencilClick = useCallback(() => {
         if (selectedImageId) {
@@ -742,12 +748,15 @@ export function InfiniteCanvas() {
                 // Reset edit history
                 setEditHistory({})
 
+                // Clear cache since we're loading a saved canvas
+                clearCache()
+
                 console.log("[v0] Canvas loaded successfully:", data.canvas.name)
             }
         } catch (error) {
             console.error("[v0] Failed to load canvas:", error)
         }
-    }, [])
+    }, [clearCache])
 
     const handleNewCanvas = useCallback(() => {
         setImages([])
@@ -760,8 +769,58 @@ export function InfiniteCanvas() {
         })
         setCurrentCanvasId(null)
         setCanvasName("")
+        clearCache() // Clear cache when creating new canvas
         console.log("[v0] New canvas created")
-    }, [])
+    }, [clearCache])
+
+    // Auto-save to cache whenever canvas state or images change
+    useEffect(() => {
+        // Don't save if there's no content
+        if (images.length === 0) return
+
+        // Debounce the save operation
+        const timeoutId = setTimeout(() => {
+            saveToCache(canvasState, images)
+        }, 1000) // Save after 1 second of inactivity
+
+        return () => clearTimeout(timeoutId)
+    }, [canvasState, images, saveToCache])
+
+    // Check for cached data on component mount
+    useEffect(() => {
+        if (hasCachedData()) {
+            setShowRestoreNotification(true)
+        }
+    }, [hasCachedData])
+
+    // Handle cache restoration
+    const handleRestoreFromCache = useCallback(() => {
+        const cachedData = loadFromCache()
+        if (!cachedData) return
+
+        // Restore canvas state
+        setCanvasState(cachedData.canvasState)
+
+        // Restore images
+        setImages(cachedData.images)
+
+        // Load images for rendering
+        cachedData.images.forEach((imageData) => {
+            const img = new Image()
+            img.crossOrigin = "anonymous"
+            img.onload = () => {
+                setLoadedImages((prev) => new Map(prev).set(imageData.url, img))
+            }
+            img.src = imageData.url
+        })
+
+        console.log("[v0] Canvas restored from cache")
+    }, [loadFromCache])
+
+    // Handle cache dismissal
+    const handleDismissCache = useCallback(() => {
+        clearCache()
+    }, [clearCache])
 
     // Resize canvas to match container
     const resizeCanvas = useCallback(() => {
@@ -917,6 +976,13 @@ export function InfiniteCanvas() {
                     onCancel={handleMaskCancel}
                 />
             )}
+
+            {/* Cache Restore Notification */}
+            <CacheRestoreNotification
+                hasCachedData={showRestoreNotification}
+                onRestore={handleRestoreFromCache}
+                onDismiss={handleDismissCache}
+            />
         </div>
     )
 }
