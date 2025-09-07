@@ -684,7 +684,9 @@ export function InfiniteCanvas() {
                     img.onload = () => {
                         setLoadedImages((prev) => {
                             const updated = new Map(prev)
-                            updated.set(result.editedImageUrl, img)
+                            if (result.editedImageUrl) {
+                                updated.set(result.editedImageUrl, img)
+                            }
                             // Remove the old image URL from cache
                             if (prev.has(selectedImage.url)) {
                                 updated.delete(selectedImage.url)
@@ -692,7 +694,9 @@ export function InfiniteCanvas() {
                             return updated
                         })
                     }
-                    img.src = result.editedImageUrl
+                    if (result.editedImageUrl) {
+                        img.src = result.editedImageUrl
+                    }
 
                     // Update the edit history to associate with the new edited image's ID
                     setEditHistory((prev) => ({
@@ -702,7 +706,7 @@ export function InfiniteCanvas() {
                                 ? {
                                     ...edit,
                                     status: "completed" as const,
-                                    resultUrl: result.editedImageUrl,
+                                    resultUrl: result.editedImageUrl || "",
                                 }
                                 : edit,
                         ),
