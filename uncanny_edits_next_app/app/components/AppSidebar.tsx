@@ -18,7 +18,7 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-import { Home, User, Zap, Gem, Mic, Wand2 } from 'lucide-react'
+import { Home, Pen, User, Zap, Gem, Mic, Wand2 } from 'lucide-react'
 import { NavUser } from "./UserSidebarNav"
 import Link from "next/link"
 import { ModeToggle } from "./ModeToggle"
