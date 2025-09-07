@@ -55,18 +55,22 @@ export function MaskTool({ imageUrl, imageWidth, imageHeight, onMaskComplete, on
         maskCanvas.width = canvasWidth
         maskCanvas.height = canvasHeight
 
-        // Draw image on main canvas
+        // Draw image on main canvas (always visible)
         const ctx = canvas.getContext("2d")
         if (ctx) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height)
             ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
         }
 
         // Initialize mask canvas with transparent background
         const maskCtx = maskCanvas.getContext("2d")
         if (maskCtx) {
-            maskCtx.fillStyle = "rgba(0, 0, 0, 0)"
-            maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height)
+            maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height)
         }
+
+        // Initial overlay draw to ensure image is visible - inline the logic
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
     }, [image])
 
     // Draw mask overlay
@@ -79,25 +83,41 @@ export function MaskTool({ imageUrl, imageWidth, imageHeight, onMaskComplete, on
         const maskCtx = maskCanvas.getContext("2d")
         if (!ctx || !maskCtx) return
 
-        // Clear and redraw image
+        // Clear and redraw image first (always visible)
         ctx.clearRect(0, 0, canvas.width, canvas.height)
         ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
 
-        // Draw mask overlay with red tint
+        // Draw mask overlay with red tint on top
+        ctx.save()
+        ctx.globalAlpha = 0.4 // Semi-transparent red overlay
+        ctx.fillStyle = "red"
+        
         const maskImageData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height)
-        const overlayImageData = ctx.createImageData(canvas.width, canvas.height)
-
-        for (let i = 0; i < maskImageData.data.length; i += 4) {
-            const alpha = maskImageData.data[i + 3]
-            if (alpha > 0) {
-                overlayImageData.data[i] = 255     // Red
-                overlayImageData.data[i + 1] = 0   // Green
-                overlayImageData.data[i + 2] = 0   // Blue
-                overlayImageData.data[i + 3] = 100 // Semi-transparent
+        
+        // Create a temporary canvas for the mask overlay
+        const tempCanvas = document.createElement('canvas')
+        tempCanvas.width = canvas.width
+        tempCanvas.height = canvas.height
+        const tempCtx = tempCanvas.getContext('2d')
+        
+        if (tempCtx) {
+            const tempImageData = tempCtx.createImageData(canvas.width, canvas.height)
+            
+            for (let i = 0; i < maskImageData.data.length; i += 4) {
+                const alpha = maskImageData.data[i + 3]
+                if (alpha > 0) {
+                    tempImageData.data[i] = 255     // Red
+                    tempImageData.data[i + 1] = 0   // Green
+                    tempImageData.data[i + 2] = 0   // Blue
+                    tempImageData.data[i + 3] = 255 // Full alpha for the overlay
+                }
             }
+            
+            tempCtx.putImageData(tempImageData, 0, 0)
+            ctx.drawImage(tempCanvas, 0, 0)
         }
-
-        ctx.putImageData(overlayImageData, 0, 0)
+        
+        ctx.restore()
     }, [image])
 
     // Handle mouse down
