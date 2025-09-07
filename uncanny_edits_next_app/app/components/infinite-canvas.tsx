@@ -642,45 +642,68 @@ export function InfiniteCanvas() {
                 const result = await api.post("/api/edit-image", requestBody)
 
                 if (result.editedImageUrl) {
-                    // Create new image with edited URL
+                    // Create a new image object for the edited image
                     const editedImage: CanvasImage = {
                         ...selectedImage,
-                        id: Date.now().toString(),
+                        id: Date.now().toString(), // Assign a new unique ID
                         url: result.editedImageUrl,
                         filename: `edited-${selectedImage.filename}`,
                         selected: true,
                     }
 
-                    // Add edited image to canvas and deselect original
-                    setImages((prev) => [...prev.map((img) => ({ ...img, selected: false })), editedImage])
+                    // Remove the original image and add the new edited one
+                    setImages((prev) => {
+                        const filteredImages = prev.filter((img) => img.id !== selectedImage.id)
+                        return [...filteredImages, editedImage]
+                    })
 
-                    // Initialize edit history for new image
+                    // Deselect all other images and ensure the new edited image is selected
+                    setImages((prev) =>
+                        prev.map((img) =>
+                            img.id === editedImage.id
+                                ? { ...img, selected: true }
+                                : { ...img, selected: false },
+                        ),
+                    )
+
+                    // Initialize edit history for the new image (or transfer if needed)
                     setEditHistory((prev) => ({
                         ...prev,
-                        [editedImage.id]: [],
+                        [editedImage.id]: [], // Clear history for new image, or consider migrating
                     }))
 
-                    // Load the edited image for rendering
+                    // Load the edited image for rendering and update cache
                     const img = new Image()
                     img.crossOrigin = "anonymous"
                     img.onload = () => {
-                        setLoadedImages((prev) => new Map(prev).set(result.editedImageUrl, img))
+                        setLoadedImages((prev) => {
+                            const updated = new Map(prev)
+                            updated.set(result.editedImageUrl, img)
+                            // Remove the old image URL from cache
+                            if (prev.has(selectedImage.url)) {
+                                updated.delete(selectedImage.url)
+                            }
+                            return updated
+                        })
                     }
                     img.src = result.editedImageUrl
-                }
 
-                setEditHistory((prev) => ({
-                    ...prev,
-                    [selectedImage.id]: prev[selectedImage.id].map((edit) =>
-                        edit.id === editId
-                            ? {
-                                ...edit,
-                                status: "completed" as const,
-                                resultUrl: result.editedImageUrl,
-                            }
-                            : edit,
-                    ),
-                }))
+                    // Update the edit history to associate with the new edited image's ID
+                    setEditHistory((prev) => ({
+                        ...prev,
+                        [editedImage.id]: prev[selectedImage.id].map((edit) =>
+                            edit.id === editId
+                                ? {
+                                    ...edit,
+                                    status: "completed" as const,
+                                    resultUrl: result.editedImageUrl,
+                                }
+                                : edit,
+                        ),
+                        // Remove the old image's edit history if necessary
+                        [selectedImage.id]: [],
+                    }))
+                }
 
                 if (tool === "pencil") {
                     setDrawingPaths([])
