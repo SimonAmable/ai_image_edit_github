@@ -18,7 +18,11 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"
 
+<<<<<<< HEAD
 import { Home, Pen, User, Zap, Gem, Mic } from 'lucide-react'
+=======
+import { Home, User, Zap, Gem, Mic, Wand2 } from 'lucide-react'
+>>>>>>> main
 import { NavUser } from "./UserSidebarNav"
 import Link from "next/link"
 import { ModeToggle } from "./ModeToggle"
@@ -26,6 +30,7 @@ import FeedbackSidebarItem from "./FeedbackSidebarItem"
 
 // Sidebar menu data constant
 const sidebarMenuItems = [
+<<<<<<< HEAD
     {
         id: "home",
         title: "Home",
@@ -76,6 +81,58 @@ const sidebarMenuItems = [
     //   description: "Save and organize ideas",
     //   href: "/capture"
     // }
+=======
+  {
+    id: "home",
+    title: "Home",
+    icon: Home,
+    description: "Home",
+    href: "/"
+  },
+  {
+    id: "profile",
+    title: "Profile",
+    icon: User,
+    description: "View and manage your profile",
+    href: "/profile"
+  },
+  {
+    id: "pricing",
+    title: "Pricing",
+    icon: Gem,
+    description: "View and manage your pricing",
+    href: "/pricing"
+  },
+  // create
+  {
+    id: "create",
+    title: "Create",
+    icon: Wand2,
+    description: "Create images using AI",
+    href: "/create"
+  },
+  {
+    id: "speech-to-text",
+    title: "Speech to Text",
+    icon: Mic,
+    description: "Convert speech to text using AI",
+    href: "/speech-to-text"
+  },
+  // {
+  //   id: "enhance",
+  //   title: "Enhance Images",
+  //   icon: Wand2,
+  //   description: "Improve image quality",
+  //   href: "/enhance"
+  // },
+  // {
+  //   id: "capture",
+  //   title: "Capture Ideas",
+  //   icon: Camera,
+  //   description: "Save and organize ideas",
+  //   href: "/capture"
+  // }
+>>>>>>> main
 ]
 
 // Logo and title component
