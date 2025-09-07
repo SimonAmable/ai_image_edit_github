@@ -19,8 +19,8 @@ const plans = [
     bg: "bg-card",
     text: "text-foreground",
     features: [
-      "Limited Flux image generations",
-      "Basic Flux Kontext image editing",
+      "3 AI image edits per month",
+      "Basic image editing tools",
     ],
     isFree: true,
   },
@@ -33,9 +33,9 @@ const plans = [
     text: "text-foreground",
     priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_BASIC_MONTLY as string,
     features: [
-      "1,000+ Flux image generations/month",
-      "Loads of Flux Kontext Pro image editing",
-      "Access to GPT image model",
+      "100 AI image edits per month",
+      "Advanced editing capabilities",
+      "Priority processing",
     ],
   },
   {
@@ -47,9 +47,9 @@ const plans = [
     text: "text-foreground",
     priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO_MONTLY as string,
     features: [
-      "5,000+ Flux image generations/month",
-      "Nearly unlimited Flux Kontext Pro image editing",
-      "Access to GPT image model",
+      "Nearly unlimited image edits per month",
+      "Premium editing features",
+      "Fastest processing speed",
     ],
   },
 ];
