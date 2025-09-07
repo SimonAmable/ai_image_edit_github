@@ -131,27 +131,24 @@ export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sideb
                                         </TooltipContent>
                                     </Tooltip>
                                 </SidebarMenuItem>
-
                             )
                         })}
 
                         {/* Feedback Menu Item */}
                         <FeedbackSidebarItem />
                     </SidebarMenu>
-
                 </SidebarGroup>
             </SidebarContent>
 
             <SidebarFooter>
                 <div className="flex flex-col gap-2 items-start justify-center">
-                    <SidebarTrigger className="ml-1 " />
+                    <SidebarTrigger className="ml-1" />
                     <ModeToggle />
                 </div>
 
                 <div>
                     <NavUser />
                 </div>
-
 
                 <div className="flex flex-row gap-2 text-xs text-muted-foreground text-center w-full justify-center">
                     {/* <Link href="/privacy" className="transition-colors hover:text-sidebar-foreground">Privacy Policy</Link> */}

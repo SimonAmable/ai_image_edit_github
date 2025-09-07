@@ -1,8 +1,6 @@
+import FirstVisitWrapper from "./components/Waitlist/FirstVisitWrapper";
+import LandingPage from "./components/Waitlist/LandingPage";
 
 export default function Home() {
-  return (
-    <div className="w-full px-4 lg:px-40">
-
-    </div>
-  );
+  return <FirstVisitWrapper><LandingPage /></FirstVisitWrapper>;
 }
