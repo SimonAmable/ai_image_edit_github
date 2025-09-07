@@ -1,4 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { GoogleGenAI } from "@google/genai"
+
+
 
 // Helper function to crop image using Canvas API (server-side)
 async function cropImage(
@@ -22,28 +25,23 @@ interface EditImageRequest {
   drawingPaths?: Array<{ x: number; y: number }[]> // Drawing paths for pencil tool
 }
 
+
+
 export async function POST(request: NextRequest) {
+  
+
   try {
     const { imageUrl, prompt, tool, maskData, cropData, drawingPaths }: EditImageRequest = await request.json()
+
+    console.log("[TEXT]: imageUrl", imageUrl)
+    console.log("[TEXT]: prompt", prompt)
 
     if (!imageUrl || !prompt) {
       return NextResponse.json({ error: "Image URL and prompt are required" }, { status: 400 })
     }
 
-    // Check for required environment variables
-    const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID
-    const location = process.env.GOOGLE_CLOUD_LOCATION || "us-central1"
-    const accessToken = process.env.GOOGLE_CLOUD_ACCESS_TOKEN
+    const client = new GoogleGenAI({})
 
-    if (!projectId || !accessToken) {
-      return NextResponse.json(
-        {
-          error:
-            "Google Cloud configuration missing. Please set GOOGLE_CLOUD_PROJECT_ID and GOOGLE_CLOUD_ACCESS_TOKEN environment variables.",
-        },
-        { status: 500 },
-      )
-    }
 
     // Fetch the original image
     const imageResponse = await fetch(imageUrl)
@@ -52,99 +50,56 @@ export async function POST(request: NextRequest) {
     }
 
     const imageBuffer = await imageResponse.arrayBuffer()
-    let processedImageBase64 = Buffer.from(imageBuffer).toString("base64")
-
+    const imageBase64 = Buffer.from(imageBuffer).toString("base64")
+    
     // Handle cropping if crop data is provided
+    let processedImageBase64 = imageBase64
     if (tool === "crop" && cropData) {
       processedImageBase64 = await cropImage(imageBuffer, cropData)
     }
 
-    // Prepare the API request based on the tool
-    let apiEndpoint: string
-    let requestBody: any
+    // Prepare the prompt based on the tool
+    let finalPrompt = prompt
 
-    if (tool === "mask" && maskData) {
-      // Inpainting with mask
-      apiEndpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/imagegeneration@006:predict`
-      requestBody = {
-        instances: [
-          {
-            prompt: prompt,
-            image: {
-              bytesBase64Encoded: processedImageBase64,
-            },
-            mask: {
-              image: {
-                bytesBase64Encoded: maskData,
-              },
-            },
-          },
-        ],
-        parameters: {
-          mode: "inpainting",
-          sampleCount: 1,
-        },
-      }
-    } else if (tool === "crop") {
-      // For crop, we use the cropped image with editing prompt
-      apiEndpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/imagegeneration@006:predict`
-      requestBody = {
-        instances: [
-          {
-            prompt: `Edit this cropped image: ${prompt}`,
-            image: {
-              bytesBase64Encoded: processedImageBase64,
-            },
-          },
-        ],
-        parameters: {
-          mode: "inpainting",
-          sampleCount: 1,
-        },
-      }
+    if (tool === "crop" && cropData) {
+      finalPrompt = `Edit this cropped image according to the prompt: ${prompt}. Focus on the cropped area.`
+    } else if (tool === "mask" && maskData) {
+      finalPrompt = `Edit this image according to the prompt: ${prompt}. Pay special attention to the masked areas.`
+    } else if (tool === "pencil" && drawingPaths) {
+      finalPrompt = `Edit this image according to the prompt: ${prompt}. Consider the drawn paths as guidance for the edit.`
     } else {
-      // General image editing
-      apiEndpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/imagegeneration@006:predict`
-      requestBody = {
-        instances: [
-          {
-            prompt: `Edit this image: ${prompt}`,
-            image: {
-              bytesBase64Encoded: processedImageBase64,
-            },
-          },
-        ],
-        parameters: {
-          mode: "inpainting",
-          sampleCount: 1,
-        },
+      finalPrompt = `Edit this image according to the prompt: ${prompt}`
+    }
+
+    // Convert base64 image to the format expected by Google GenAI
+    const imageData = {
+      inlineData: {
+        data: processedImageBase64,
+        mimeType: imageResponse.headers.get("content-type") || "image/png"
       }
     }
 
-    // Make the API call to Google Vertex AI
-    const response = await fetch(apiEndpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
+    // Generate content using Google GenAI Nano Banana model
+    const response = await client.models.generateContent({
+      model: "gemini-2.5-flash-image-preview",
+      contents: [finalPrompt, imageData]
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error("Google Vertex AI API error:", errorText)
-      throw new Error(`Google Vertex AI API error: ${response.status}`)
+    // Extract the generated image from the response
+    let generatedImageBase64: string | null = null
+
+    if (response.candidates && response.candidates[0] && response.candidates[0].content && response.candidates[0].content.parts) {
+      for (const part of response.candidates[0].content.parts) {
+        if (part.inlineData && part.inlineData.data) {
+          generatedImageBase64 = part.inlineData.data
+          break
+        }
+      }
     }
 
-    const result = await response.json()
-
-    // Extract the generated image
-    if (!result.predictions || !result.predictions[0] || !result.predictions[0].bytesBase64Encoded) {
+    if (!generatedImageBase64) {
       throw new Error("No image generated in response")
     }
-
-    const generatedImageBase64 = result.predictions[0].bytesBase64Encoded
 
     // Upload the generated image to Blob storage
     const generatedImageBuffer = Buffer.from(generatedImageBase64, "base64")
@@ -175,7 +130,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Image editing failed",
-        details: "Please check your Google Cloud configuration and try again.",
+        details: "Please check your Google API key and try again.",
       },
       { status: 500 },
     )
