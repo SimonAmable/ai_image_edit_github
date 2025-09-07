@@ -4,7 +4,7 @@ import { SetupInstructions } from "@/app/components/setup-instructions"
 
 export default function ImageEditor() {
     return (
-        <div className="h-screen w-screen overflow-hidden bg-muted/20">
+        <div className="fixed inset-0 bg-background z-[9999]">
             <InfiniteCanvas />
 
             {/* Show setup instructions if Google Cloud is not configured

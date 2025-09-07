@@ -6,8 +6,11 @@ import { EditingToolbar } from "@/app/components/editing-toolbar"
 import { EditHistorySidebar } from "@/app/components/edit-history-sidebar"
 import { DrawingModal } from "@/app/components/drawing-modal"
 import { CanvasManager } from "@/app/components/canvas-manager"
+import { CropTool } from "@/app/components/crop-tool"
+import { MaskTool } from "@/app/components/mask-tool"
 
 import { useRef, useEffect, useState, useCallback } from "react"
+import Link from "next/link"
 
 interface CanvasState {
     scale: number
@@ -19,6 +22,8 @@ interface MouseState {
     isDragging: boolean
     lastX: number
     lastY: number
+    dragType: "canvas" | "image" | null
+    dragImageId: string | null
 }
 
 interface CanvasImage {
@@ -59,6 +64,8 @@ export function InfiniteCanvas() {
         isDragging: false,
         lastX: 0,
         lastY: 0,
+        dragType: null,
+        dragImageId: null,
     })
 
     const [images, setImages] = useState<CanvasImage[]>([])
@@ -75,8 +82,17 @@ export function InfiniteCanvas() {
     const [currentCanvasId, setCurrentCanvasId] = useState<string | null>(null)
     const [canvasName, setCanvasName] = useState<string>("")
 
+    // Crop and Mask tool states
+    const [isCropToolOpen, setIsCropToolOpen] = useState(false)
+    const [isMaskToolOpen, setIsMaskToolOpen] = useState(false)
+    const [cropData, setCropData] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
+    const [maskData, setMaskData] = useState<string | null>(null)
+
     // Get selected image ID
     const selectedImageId = images.find((img) => img.selected)?.id || null
+
+    // State for cursor management
+    const [isHoveringImage, setIsHoveringImage] = useState(false)
 
     const handlePencilClick = useCallback(() => {
         if (selectedImageId) {
@@ -96,6 +112,77 @@ export function InfiniteCanvas() {
         },
         [],
     )
+
+    // Handle crop tool
+    const handleCropClick = useCallback(() => {
+        const selectedImage = images.find((img) => img.selected)
+        if (!selectedImage) return
+        setIsCropToolOpen(true)
+    }, [images])
+
+    const handleCropComplete = useCallback((croppedImageData: { url: string; width: number; height: number }) => {
+        const selectedImage = images.find((img) => img.selected)
+        if (!selectedImage) return
+
+        // Create new cropped image
+        const croppedImage: CanvasImage = {
+            ...selectedImage,
+            id: Date.now().toString(),
+            url: croppedImageData.url,
+            filename: `cropped-${selectedImage.filename}`,
+            width: croppedImageData.width,
+            height: croppedImageData.height,
+            originalWidth: croppedImageData.width,
+            originalHeight: croppedImageData.height,
+            selected: true,
+        }
+
+        // Remove the original image and add the cropped one
+        setImages((prev) => [
+            ...prev.filter(img => img.id !== selectedImage.id),
+            croppedImage
+        ])
+
+        // Initialize edit history for new image
+        setEditHistory((prev) => ({
+            ...prev,
+            [croppedImage.id]: [],
+        }))
+
+        // Load the cropped image for rendering
+        const img = new Image()
+        img.crossOrigin = "anonymous"
+        img.onload = () => {
+            setLoadedImages((prev) => new Map(prev).set(croppedImageData.url, img))
+        }
+        img.src = croppedImageData.url
+
+        setIsCropToolOpen(false)
+        setCropData(null)
+    }, [images])
+
+    const handleCropCancel = useCallback(() => {
+        setIsCropToolOpen(false)
+        setCropData(null)
+    }, [])
+
+    // Handle mask tool
+    const handleMaskClick = useCallback(() => {
+        const selectedImage = images.find((img) => img.selected)
+        if (!selectedImage) return
+        setIsMaskToolOpen(true)
+    }, [images])
+
+    const handleMaskComplete = useCallback((maskDataUrl: string) => {
+        setMaskData(maskDataUrl)
+        setIsMaskToolOpen(false)
+        // The mask data will be sent with the edit request
+    }, [])
+
+    const handleMaskCancel = useCallback(() => {
+        setIsMaskToolOpen(false)
+        setMaskData(null)
+    }, [])
 
     // Draw grid pattern on canvas
     const drawGrid = useCallback(
@@ -266,28 +353,109 @@ export function InfiniteCanvas() {
         [canvasState],
     )
 
-    // Handle mouse down for panning
+    // Handle mouse down for panning or image dragging
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
+        const canvas = canvasRef.current
+        if (!canvas) return
+
+        const rect = canvas.getBoundingClientRect()
+        const clickX = e.clientX - rect.left
+        const clickY = e.clientY - rect.top
+
+        // Convert screen coordinates to canvas coordinates
+        const canvasX = (clickX - canvasState.offsetX) / canvasState.scale
+        const canvasY = (clickY - canvasState.offsetY) / canvasState.scale
+
+        // Check if click is on any image (reverse order to check top images first)
+        let clickedImageId: string | null = null
+        for (let i = images.length - 1; i >= 0; i--) {
+            const img = images[i]
+            if (canvasX >= img.x && canvasX <= img.x + img.width && canvasY >= img.y && canvasY <= img.y + img.height) {
+                clickedImageId = img.id
+                break
+            }
+        }
+
+        // Determine drag type based on what was clicked
+        const dragType = clickedImageId ? "image" : "canvas"
+
         setMouseState({
             isDragging: true,
             lastX: e.clientX,
             lastY: e.clientY,
+            dragType,
+            dragImageId: clickedImageId,
         })
-    }, [])
 
-    // Handle mouse move for panning
+        // If clicking on an image, select it
+        if (clickedImageId) {
+            setImages((prev) =>
+                prev.map((img) => ({
+                    ...img,
+                    selected: img.id === clickedImageId,
+                })),
+            )
+        }
+    }, [canvasState, images])
+
+    // Handle mouse move for panning or image dragging
     const handleMouseMove = useCallback(
         (e: React.MouseEvent) => {
+            const canvas = canvasRef.current
+            if (!canvas) return
+
+            // Update cursor based on hover state (only when not dragging)
+            if (!mouseState.isDragging) {
+                const rect = canvas.getBoundingClientRect()
+                const hoverX = e.clientX - rect.left
+                const hoverY = e.clientY - rect.top
+
+                // Convert screen coordinates to canvas coordinates
+                const canvasX = (hoverX - canvasState.offsetX) / canvasState.scale
+                const canvasY = (hoverY - canvasState.offsetY) / canvasState.scale
+
+                // Check if hovering over any image
+                let hoveringImage = false
+                for (let i = images.length - 1; i >= 0; i--) {
+                    const img = images[i]
+                    if (canvasX >= img.x && canvasX <= img.x + img.width && canvasY >= img.y && canvasY <= img.y + img.height) {
+                        hoveringImage = true
+                        break
+                    }
+                }
+                setIsHoveringImage(hoveringImage)
+            }
+
+            // Handle dragging
             if (!mouseState.isDragging) return
 
             const deltaX = e.clientX - mouseState.lastX
             const deltaY = e.clientY - mouseState.lastY
 
-            setCanvasState((prev) => ({
-                ...prev,
-                offsetX: prev.offsetX + deltaX,
-                offsetY: prev.offsetY + deltaY,
-            }))
+            if (mouseState.dragType === "canvas") {
+                // Pan the canvas
+                setCanvasState((prev) => ({
+                    ...prev,
+                    offsetX: prev.offsetX + deltaX,
+                    offsetY: prev.offsetY + deltaY,
+                }))
+            } else if (mouseState.dragType === "image" && mouseState.dragImageId) {
+                // Move the selected image
+                const scaledDeltaX = deltaX / canvasState.scale
+                const scaledDeltaY = deltaY / canvasState.scale
+
+                setImages((prev) =>
+                    prev.map((img) =>
+                        img.id === mouseState.dragImageId
+                            ? {
+                                ...img,
+                                x: img.x + scaledDeltaX,
+                                y: img.y + scaledDeltaY,
+                            }
+                            : img,
+                    ),
+                )
+            }
 
             setMouseState((prev) => ({
                 ...prev,
@@ -295,17 +463,23 @@ export function InfiniteCanvas() {
                 lastY: e.clientY,
             }))
         },
-        [mouseState],
+        [mouseState, canvasState, images],
     )
 
     // Handle mouse up
     const handleMouseUp = useCallback(() => {
-        setMouseState((prev) => ({ ...prev, isDragging: false }))
+        setMouseState((prev) => ({
+            ...prev,
+            isDragging: false,
+            dragType: null,
+            dragImageId: null
+        }))
     }, [])
 
-    // Handle image click for selection
+    // Handle canvas click (for deselection when clicking empty space)
     const handleCanvasClick = useCallback(
         (e: React.MouseEvent) => {
+            // Only handle clicks that weren't part of a drag operation
             if (mouseState.isDragging) return
 
             const canvas = canvasRef.current
@@ -329,13 +503,15 @@ export function InfiniteCanvas() {
                 }
             }
 
-            // Update selection
-            setImages((prev) =>
-                prev.map((img) => ({
-                    ...img,
-                    selected: img.id === clickedImageId,
-                })),
-            )
+            // If clicking on empty space, deselect all images
+            if (!clickedImageId) {
+                setImages((prev) =>
+                    prev.map((img) => ({
+                        ...img,
+                        selected: false,
+                    })),
+                )
+            }
         },
         [canvasState, images, mouseState.isDragging],
     )
@@ -374,6 +550,12 @@ export function InfiniteCanvas() {
 
                 if (tool === "pencil" && drawingPaths.length > 0) {
                     requestBody.drawingPaths = drawingPaths
+                }
+
+
+
+                if (tool === "mask" && maskData) {
+                    requestBody.maskData = maskData
                 }
 
                 const response = await fetch("/api/edit-image", {
@@ -436,6 +618,11 @@ export function InfiniteCanvas() {
                     setDrawingPaths([])
                     setIsDrawingOnImage(false)
                     setIsDrawingMode(false)
+                }
+
+                // Clear tool data after successful edit
+                if (tool === "mask") {
+                    setMaskData(null)
                 }
 
                 console.log("[v0] Edit completed successfully")
@@ -601,11 +788,19 @@ export function InfiniteCanvas() {
         resizeCanvas()
 
         const handleResize = () => resizeCanvas()
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                window.location.href = '/'
+            }
+        }
+
         window.addEventListener("resize", handleResize)
+        window.addEventListener("keydown", handleKeyDown)
 
         return () => {
             canvas.removeEventListener("wheel", handleWheel)
             window.removeEventListener("resize", handleResize)
+            window.removeEventListener("keydown", handleKeyDown)
         }
     }, [handleWheel, resizeCanvas])
 
@@ -621,10 +816,17 @@ export function InfiniteCanvas() {
     }, [canvasState, images, loadedImages, drawCanvas])
 
     return (
-        <div ref={containerRef} className="relative h-full w-full overflow-hidden">
+        <div ref={containerRef} className="relative h-full w-full overflow-hidden bg-muted/20">
             <canvas
                 ref={canvasRef}
-                className="absolute inset-0 cursor-grab active:cursor-grabbing"
+                className={`absolute inset-0 ${mouseState.isDragging
+                    ? mouseState.dragType === "image"
+                        ? "cursor-move"
+                        : "cursor-grabbing"
+                    : isHoveringImage
+                        ? "cursor-move"
+                        : "cursor-grab"
+                    }`}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
@@ -632,44 +834,89 @@ export function InfiniteCanvas() {
                 onClick={handleCanvasClick}
             />
 
-            <div className="absolute top-4 right-4 flex items-center gap-4">
-                <div className="bg-background/80 backdrop-blur-sm rounded-lg px-3 py-2 text-sm font-mono">
+            {/* Top UI - Fixed positioning */}
+            <div className="fixed top-4 right-4 flex items-center gap-4 z-40">
+                <div className="bg-background/90 backdrop-blur-sm rounded-lg px-3 py-2 text-sm font-mono border shadow-lg">
                     {Math.round(canvasState.scale * 100)}%
                 </div>
                 <ImageUpload onImageUploaded={handleImageUploaded} />
             </div>
 
-            <div className="absolute top-4 left-4">
+            <div className="fixed top-4 left-4 z-40 flex items-center gap-3">
+                {/* Back Button */}
+                <Link
+                    href="/"
+                    className="bg-background/90 backdrop-blur-sm border rounded-lg px-3 py-2 shadow-lg hover:bg-background/95 transition-colors flex items-center gap-2"
+                    title="Back to Home"
+                >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Back
+                </Link>
+
                 <CanvasManager onSave={handleCanvasSave} onLoad={handleCanvasLoad} onNew={handleNewCanvas} />
             </div>
 
             {canvasName && (
-                <div className="absolute top-4 left-1/2 transform -translate-x-1/2">
-                    <div className="bg-background/80 backdrop-blur-sm rounded-lg px-3 py-2 text-sm font-medium">{canvasName}</div>
+                <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-40">
+                    <div className="bg-background/90 backdrop-blur-sm rounded-lg px-3 py-2 text-sm font-medium border shadow-lg">
+                        {canvasName}
+                    </div>
                 </div>
             )}
 
-            {/* Editing toolbar at bottom center */}
-            <EditingToolbar
-                selectedImageId={selectedImageId}
-                onEditSubmit={handleEditSubmit}
-                onPencilClick={handlePencilClick}
-                isProcessing={isProcessingEdit}
-            />
+            {/* Editing toolbar - Fixed at bottom center */}
+            <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-40">
+                <EditingToolbar
+                    selectedImageId={selectedImageId}
+                    onEditSubmit={handleEditSubmit}
+                    onPencilClick={handlePencilClick}
+                    onCropClick={handleCropClick}
+                    onMaskClick={handleMaskClick}
+                    isProcessing={isProcessingEdit}
+                    hasMaskData={!!maskData}
+                />
+            </div>
 
-            <EditHistorySidebar
-                selectedImageId={selectedImageId}
-                editHistory={editHistory}
-                onRevertToEdit={handleRevertToEdit}
-                isCollapsed={sidebarCollapsed}
-                onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-            />
+            {/* Edit History Sidebar - Fixed positioning */}
+            <div className="fixed right-0 top-0 h-full z-30">
+                <EditHistorySidebar
+                    selectedImageId={selectedImageId}
+                    editHistory={editHistory}
+                    onRevertToEdit={handleRevertToEdit}
+                    isCollapsed={sidebarCollapsed}
+                    onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+                />
+            </div>
 
             <DrawingModal
                 isOpen={isDrawingModalOpen}
                 onClose={() => setIsDrawingModalOpen(false)}
                 onSave={handleDrawingModalSave}
             />
+
+            {/* Crop Tool */}
+            {isCropToolOpen && selectedImageId && (
+                <CropTool
+                    imageUrl={images.find(img => img.id === selectedImageId)?.url || ""}
+                    imageWidth={images.find(img => img.id === selectedImageId)?.originalWidth || 0}
+                    imageHeight={images.find(img => img.id === selectedImageId)?.originalHeight || 0}
+                    onCropComplete={handleCropComplete}
+                    onCancel={handleCropCancel}
+                />
+            )}
+
+            {/* Mask Tool */}
+            {isMaskToolOpen && selectedImageId && (
+                <MaskTool
+                    imageUrl={images.find(img => img.id === selectedImageId)?.url || ""}
+                    imageWidth={images.find(img => img.id === selectedImageId)?.originalWidth || 0}
+                    imageHeight={images.find(img => img.id === selectedImageId)?.originalHeight || 0}
+                    onMaskComplete={handleMaskComplete}
+                    onCancel={handleMaskCancel}
+                />
+            )}
         </div>
     )
 }

@@ -11,10 +11,21 @@ interface EditingToolbarProps {
     selectedImageId: string | null
     onEditSubmit: (prompt: string, tool: "crop" | "mask" | "pencil" | null) => void
     onPencilClick: () => void
+    onCropClick: () => void
+    onMaskClick: () => void
     isProcessing: boolean
+    hasMaskData: boolean
 }
 
-export function EditingToolbar({ selectedImageId, onEditSubmit, onPencilClick, isProcessing }: EditingToolbarProps) {
+export function EditingToolbar({ 
+    selectedImageId, 
+    onEditSubmit, 
+    onPencilClick, 
+    onCropClick, 
+    onMaskClick, 
+    isProcessing, 
+    hasMaskData 
+}: EditingToolbarProps) {
     const [prompt, setPrompt] = useState("")
     const [activeTool, setActiveTool] = useState<"crop" | "mask" | "pencil" | null>(null)
 
@@ -29,7 +40,14 @@ export function EditingToolbar({ selectedImageId, onEditSubmit, onPencilClick, i
 
     const handleToolSelect = (tool: "crop" | "mask") => {
         if (!selectedImageId) return
-        setActiveTool(activeTool === tool ? null : tool)
+        
+        if (tool === "crop") {
+            onCropClick()
+            // Don't set active tool for crop since it's immediate action
+        } else if (tool === "mask") {
+            setActiveTool(activeTool === tool ? null : tool)
+            onMaskClick()
+        }
     }
 
     const handlePencilClick = () => {
@@ -38,8 +56,7 @@ export function EditingToolbar({ selectedImageId, onEditSubmit, onPencilClick, i
     }
 
     return (
-        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-10">
-            <div className="bg-background/95 backdrop-blur-sm border rounded-xl shadow-lg p-4">
+        <div className="bg-background/95 backdrop-blur-sm border rounded-xl shadow-lg p-4">
                 <form onSubmit={handleSubmit} className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
                         <Button
@@ -56,7 +73,7 @@ export function EditingToolbar({ selectedImageId, onEditSubmit, onPencilClick, i
 
                         <Button
                             type="button"
-                            variant={activeTool === "crop" ? "default" : "outline"}
+                            variant="outline"
                             size="sm"
                             onClick={() => handleToolSelect("crop")}
                             disabled={!selectedImageId || isProcessing}
@@ -68,14 +85,14 @@ export function EditingToolbar({ selectedImageId, onEditSubmit, onPencilClick, i
 
                         <Button
                             type="button"
-                            variant={activeTool === "mask" ? "default" : "outline"}
+                            variant={activeTool === "mask" || hasMaskData ? "default" : "outline"}
                             size="sm"
                             onClick={() => handleToolSelect("mask")}
                             disabled={!selectedImageId || isProcessing}
                             className="gap-2"
                         >
                             <Scissors className="h-4 w-4" />
-                            Mask
+                            Mask {hasMaskData && "✓"}
                         </Button>
                     </div>
 
@@ -100,13 +117,15 @@ export function EditingToolbar({ selectedImageId, onEditSubmit, onPencilClick, i
                 </form>
 
                 {/* Tool status indicator */}
-                {activeTool && selectedImageId && (
+                {selectedImageId && (hasMaskData || activeTool) && (
                     <div className="mt-2 text-sm text-muted-foreground text-center">
-                        {activeTool === "crop"
-                            ? "Crop tool active - click and drag to select area"
-                            : activeTool === "mask"
-                                ? "Mask tool active - paint over areas to mask"
-                                : "Draw tool active - draw on the image to mark areas for editing"}
+                        {hasMaskData && "Mask applied - "}
+                        {activeTool === "mask"
+                            ? "Click mask button to paint areas"
+                            : activeTool === "pencil"
+                                ? "Draw tool active - draw on the image to mark areas for editing"
+                                : ""}
+                        {hasMaskData && "Enter your prompt and click Send"}
                     </div>
                 )}
 
@@ -122,6 +141,5 @@ export function EditingToolbar({ selectedImageId, onEditSubmit, onPencilClick, i
                     </div>
                 )}
             </div>
-        </div>
     )
 }

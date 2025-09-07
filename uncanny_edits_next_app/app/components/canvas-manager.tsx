@@ -3,7 +3,17 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/app/components/ui/button"
 import { Input } from "@/app/components/ui/input"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/app/components/ui/dialog"
+// Simple modal components
+const Modal = ({ isOpen, onClose, children }: { isOpen: boolean; onClose: () => void; children: React.ReactNode }) => {
+    if (!isOpen) return null
+    return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-background rounded-lg p-6 max-w-md w-full mx-4">
+                {children}
+            </div>
+        </div>
+    )
+}
 import { Save, FolderOpen, Plus } from "lucide-react"
 
 interface Canvas {
@@ -28,8 +38,11 @@ export function CanvasManager({ onSave, onLoad, onNew }: CanvasManagerProps) {
 
     const loadCanvases = async () => {
         try {
+            console.log("Loading canvases...")
             const response = await fetch("/api/canvas/list")
+            console.log("Response status:", response.status)
             const data = await response.json()
+            console.log("Response data:", data)
             if (data.canvases) {
                 setCanvases(data.canvases)
             }
@@ -47,6 +60,7 @@ export function CanvasManager({ onSave, onLoad, onNew }: CanvasManagerProps) {
 
         setIsLoading(true)
         try {
+            console.log("Saving canvas with name:", saveName.trim())
             await onSave(saveName.trim())
             setSaveName("")
             setSaveDialogOpen(false)
@@ -77,62 +91,62 @@ export function CanvasManager({ onSave, onLoad, onNew }: CanvasManagerProps) {
                 New
             </Button>
 
-            <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
-                <DialogTrigger asChild>
-                    <Button variant="outline" size="sm">
-                        <Save className="w-4 h-4 mr-1" />
-                        Save
-                    </Button>
-                </DialogTrigger>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Save Canvas</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                        <Input
-                            placeholder="Canvas name"
-                            value={saveName}
-                            onChange={(e) => setSaveName(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleSave()}
-                        />
+            <Button variant="outline" size="sm" onClick={() => setSaveDialogOpen(true)}>
+                <Save className="w-4 h-4 mr-1" />
+                Save
+            </Button>
+
+            <Modal isOpen={saveDialogOpen} onClose={() => setSaveDialogOpen(false)}>
+                <h2 className="text-lg font-semibold mb-4">Save Canvas</h2>
+                <div className="space-y-4">
+                    <Input
+                        placeholder="Canvas name"
+                        value={saveName}
+                        onChange={(e) => setSaveName(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleSave()}
+                    />
+                    <div className="flex gap-2">
                         <Button onClick={handleSave} disabled={!saveName.trim() || isLoading}>
                             {isLoading ? "Saving..." : "Save Canvas"}
                         </Button>
+                        <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
+                            Cancel
+                        </Button>
                     </div>
-                </DialogContent>
-            </Dialog>
+                </div>
+            </Modal>
 
-            <Dialog open={loadDialogOpen} onOpenChange={setLoadDialogOpen}>
-                <DialogTrigger asChild>
-                    <Button variant="outline" size="sm">
-                        <FolderOpen className="w-4 h-4 mr-1" />
-                        Load
-                    </Button>
-                </DialogTrigger>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Load Canvas</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-2 max-h-96 overflow-y-auto">
-                        {canvases.length === 0 ? (
-                            <p className="text-muted-foreground text-center py-4">No saved canvases</p>
-                        ) : (
-                            canvases.map((canvas) => (
-                                <div
-                                    key={canvas.id}
-                                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted cursor-pointer"
-                                    onClick={() => handleLoad(canvas.id)}
-                                >
-                                    <div>
-                                        <p className="font-medium">{canvas.name}</p>
-                                        <p className="text-sm text-muted-foreground">{new Date(canvas.updated_at).toLocaleDateString()}</p>
-                                    </div>
+            <Button variant="outline" size="sm" onClick={() => setLoadDialogOpen(true)}>
+                <FolderOpen className="w-4 h-4 mr-1" />
+                Load
+            </Button>
+
+            <Modal isOpen={loadDialogOpen} onClose={() => setLoadDialogOpen(false)}>
+                <h2 className="text-lg font-semibold mb-4">Load Canvas</h2>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {canvases.length === 0 ? (
+                        <p className="text-muted-foreground text-center py-4">No saved canvases</p>
+                    ) : (
+                        canvases.map((canvas) => (
+                            <div
+                                key={canvas.id}
+                                className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted cursor-pointer"
+                                onClick={() => handleLoad(canvas.id)}
+                            >
+                                <div>
+                                    <p className="font-medium">{canvas.name}</p>
+                                    <p className="text-sm text-muted-foreground">{new Date(canvas.updated_at).toLocaleDateString()}</p>
                                 </div>
-                            ))
-                        )}
-                    </div>
-                </DialogContent>
-            </Dialog>
+                            </div>
+                        ))
+                    )}
+                </div>
+                <div className="mt-4">
+                    <Button variant="outline" onClick={() => setLoadDialogOpen(false)}>
+                        Cancel
+                    </Button>
+                </div>
+            </Modal>
         </div>
     )
 }

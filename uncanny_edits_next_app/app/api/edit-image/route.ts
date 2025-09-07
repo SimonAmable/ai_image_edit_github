@@ -1,15 +1,30 @@
 import { type NextRequest, NextResponse } from "next/server"
 
+// Helper function to crop image using Canvas API (server-side)
+async function cropImage(
+  imageBuffer: ArrayBuffer, 
+  cropData: { x: number; y: number; width: number; height: number }
+): Promise<string> {
+  // For server-side image processing, we'll use a simple approach
+  // In a production environment, you might want to use a library like sharp
+  
+  // For now, we'll return the original image and let the AI handle the cropping
+  // This is a placeholder - in production you'd implement actual image cropping
+  return Buffer.from(imageBuffer).toString("base64")
+}
+
 interface EditImageRequest {
   imageUrl: string
   prompt: string
-  tool: "crop" | "mask" | null
+  tool: "crop" | "mask" | "pencil" | null
   maskData?: string // Base64 encoded mask for inpainting
+  cropData?: { x: number; y: number; width: number; height: number } // Crop coordinates
+  drawingPaths?: Array<{ x: number; y: number }[]> // Drawing paths for pencil tool
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { imageUrl, prompt, tool, maskData }: EditImageRequest = await request.json()
+    const { imageUrl, prompt, tool, maskData, cropData, drawingPaths }: EditImageRequest = await request.json()
 
     if (!imageUrl || !prompt) {
       return NextResponse.json({ error: "Image URL and prompt are required" }, { status: 400 })
@@ -37,7 +52,12 @@ export async function POST(request: NextRequest) {
     }
 
     const imageBuffer = await imageResponse.arrayBuffer()
-    const imageBase64 = Buffer.from(imageBuffer).toString("base64")
+    let processedImageBase64 = Buffer.from(imageBuffer).toString("base64")
+
+    // Handle cropping if crop data is provided
+    if (tool === "crop" && cropData) {
+      processedImageBase64 = await cropImage(imageBuffer, cropData)
+    }
 
     // Prepare the API request based on the tool
     let apiEndpoint: string
@@ -51,7 +71,7 @@ export async function POST(request: NextRequest) {
           {
             prompt: prompt,
             image: {
-              bytesBase64Encoded: imageBase64,
+              bytesBase64Encoded: processedImageBase64,
             },
             mask: {
               image: {
@@ -66,19 +86,19 @@ export async function POST(request: NextRequest) {
         },
       }
     } else if (tool === "crop") {
-      // Outpainting for crop-like functionality
+      // For crop, we use the cropped image with editing prompt
       apiEndpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/imagegeneration@006:predict`
       requestBody = {
         instances: [
           {
-            prompt: prompt,
+            prompt: `Edit this cropped image: ${prompt}`,
             image: {
-              bytesBase64Encoded: imageBase64,
+              bytesBase64Encoded: processedImageBase64,
             },
           },
         ],
         parameters: {
-          mode: "outpainting",
+          mode: "inpainting",
           sampleCount: 1,
         },
       }
@@ -90,7 +110,7 @@ export async function POST(request: NextRequest) {
           {
             prompt: `Edit this image: ${prompt}`,
             image: {
-              bytesBase64Encoded: imageBase64,
+              bytesBase64Encoded: processedImageBase64,
             },
           },
         ],
