@@ -4,9 +4,17 @@ import { type NextRequest, NextResponse } from "next/server"
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
+    
+    // Check if user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    
     const { name, zoomLevel, panX, panY, images } = await request.json()
 
-    // Create or update canvas
+    // Create or update canvas - ensure user_id is set
     const { data: canvas, error: canvasError } = await supabase
       .from("canvases")
       .upsert({
@@ -14,6 +22,7 @@ export async function POST(request: NextRequest) {
         zoom_level: zoomLevel,
         pan_x: panX,
         pan_y: panY,
+        user_id: user.id, // Ensure canvas belongs to authenticated user
         updated_at: new Date().toISOString(),
       })
       .select()
@@ -24,14 +33,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to save canvas" }, { status: 500 })
     }
 
-    // Delete existing images for this canvas
-    await supabase.from("canvas_images").delete().eq("canvas_id", canvas.id)
+    // Delete existing images for this canvas and user
+    await supabase
+      .from("canvas_images")
+      .delete()
+      .eq("canvas_id", canvas.id)
+      .eq("user_id", user.id)
 
-    // Save images
+    // Save images - ensure user_id is set for each image
     if (images && images.length > 0) {
       const { error: imagesError } = await supabase.from("canvas_images").insert(
         images.map((img: any) => ({
           canvas_id: canvas.id,
+          user_id: user.id, // Ensure image belongs to authenticated user
           image_url: img.url,
           filename: img.filename,
           x: img.x,

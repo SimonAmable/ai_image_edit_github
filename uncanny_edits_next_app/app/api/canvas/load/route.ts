@@ -4,6 +4,14 @@ import { type NextRequest, NextResponse } from "next/server"
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
+    
+    // Check if user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    
     const { searchParams } = new URL(request.url)
     const canvasId = searchParams.get("id")
 
@@ -11,19 +19,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Canvas ID required" }, { status: 400 })
     }
 
-    // Load canvas
-    const { data: canvas, error: canvasError } = await supabase.from("canvases").select("*").eq("id", canvasId).single()
+    // Load canvas - only if it belongs to the authenticated user
+    const { data: canvas, error: canvasError } = await supabase
+      .from("canvases")
+      .select("*")
+      .eq("id", canvasId)
+      .eq("user_id", user.id)
+      .single()
 
     if (canvasError) {
       console.error("Canvas load error:", canvasError)
       return NextResponse.json({ error: "Canvas not found" }, { status: 404 })
     }
 
-    // Load images
+    // Load images - only for this canvas and user
     const { data: images, error: imagesError } = await supabase
       .from("canvas_images")
       .select("*")
       .eq("canvas_id", canvasId)
+      .eq("user_id", user.id)
       .order("created_at", { ascending: true })
 
     if (imagesError) {

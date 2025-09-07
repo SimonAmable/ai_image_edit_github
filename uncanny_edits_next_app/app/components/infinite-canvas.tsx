@@ -13,6 +13,7 @@ import { useRef, useEffect, useState, useCallback } from "react"
 import Link from "next/link"
 import { useCanvasCache } from "@/app/hooks/use-canvas-cache"
 import { CacheRestoreNotification } from "@/app/components/cache-restore-notification"
+import { api } from "@/app/utils/api-client"
 
 interface CanvasState {
     scale: number
@@ -638,20 +639,7 @@ export function InfiniteCanvas() {
                     requestBody.maskData = maskData
                 }
 
-                const response = await fetch("/api/edit-image", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify(requestBody),
-                })
-
-                if (!response.ok) {
-                    const errorData = await response.json()
-                    throw new Error(errorData.error || "Failed to edit image")
-                }
-
-                const result = await response.json()
+                const result = await api.post("/api/edit-image", requestBody)
 
                 if (result.editedImageUrl) {
                     // Create new image with edited URL

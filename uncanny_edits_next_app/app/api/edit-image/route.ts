@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { GoogleGenAI } from "@google/genai"
+import { createClient } from "@/app/utils/supabase/server"
 
 
 
@@ -28,19 +29,48 @@ interface EditImageRequest {
 
 
 export async function POST(request: NextRequest) {
-  
+   try {
+     // Get authenticated user
+     const supabase = await createClient()
+     const { data: { user }, error: authError } = await supabase.auth.getUser()
+     
+     // If JWT validation fails, try to extract user ID from the cookie directly
+     let userId = user?.id
+     
+     if (!userId) {
+       const cookieHeader = request.headers.get('cookie')
+       if (cookieHeader) {
+         try {
+           // Extract user ID from the Supabase auth cookie
+           const authCookieMatch = cookieHeader.match(/sb-[^-]+-auth-token\.0=([^;]+)/)
+           if (authCookieMatch) {
+             const cookieValue = authCookieMatch[1]
+             // Remove 'base64-' prefix if present
+             const base64Data = cookieValue.startsWith('base64-') ? cookieValue.substring(7) : cookieValue
+             const decodedData = JSON.parse(Buffer.from(base64Data, 'base64').toString())
+             userId = decodedData.user?.id
+           }
+         } catch (error) {
+           console.log("Edit-image route - failed to extract user ID from cookie:", error)
+         }
+       }
+     }
+     
+     if (!userId) {
+       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+     }
 
-  try {
-    const { imageUrl, prompt, tool, maskData, cropData, drawingPaths }: EditImageRequest = await request.json()
+     const { imageUrl, prompt, tool, maskData, cropData, drawingPaths }: EditImageRequest = await request.json()
 
-    console.log("[TEXT]: imageUrl", imageUrl)
-    console.log("[TEXT]: prompt", prompt)
+     console.log("[TEXT]: imageUrl", imageUrl)
+     console.log("[TEXT]: prompt", prompt)
+     console.log("[TEXT]: user", userId)
 
-    if (!imageUrl || !prompt) {
-      return NextResponse.json({ error: "Image URL and prompt are required" }, { status: 400 })
-    }
+     if (!imageUrl || !prompt) {
+       return NextResponse.json({ error: "Image URL and prompt are required" }, { status: 400 })
+     }
 
-    const client = new GoogleGenAI({})
+     const client = new GoogleGenAI({})
 
 
     // Fetch the original image
@@ -111,6 +141,9 @@ export async function POST(request: NextRequest) {
     const uploadResponse = await fetch(`${request.nextUrl.origin}/api/upload`, {
       method: "POST",
       body: uploadFormData,
+      headers: {
+        'Cookie': request.headers.get('cookie') || '',
+      },
     })
 
     if (!uploadResponse.ok) {

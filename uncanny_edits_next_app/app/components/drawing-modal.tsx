@@ -4,6 +4,7 @@ import type React from "react"
 import { useRef, useEffect, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { X, Download, Trash2 } from "lucide-react"
+import { apiUpload } from "@/app/utils/api-client"
 
 interface DrawingModalProps {
     isOpen: boolean
@@ -109,16 +110,7 @@ export function DrawingModal({
                 const formData = new FormData()
                 formData.append("file", blob, filename)
 
-                const response = await fetch("/api/upload", {
-                    method: "POST",
-                    body: formData,
-                })
-
-                //TODO:Remove this
-                console.log("ERROR SAVING DRAWING: ", response)
-                if (!response.ok) throw new Error("Failed to upload drawing")
-
-                const result = await response.json()
+                const result = await apiUpload("/api/upload", formData)
 
                 onSave({
                     url: result.url,

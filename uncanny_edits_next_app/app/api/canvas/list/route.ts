@@ -4,10 +4,19 @@ import { NextResponse } from "next/server"
 export async function GET() {
   try {
     const supabase = await createClient()
+    
+    // Check if user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
+    // Only get canvases for the authenticated user
     const { data: canvases, error } = await supabase
       .from("canvases")
       .select("id, name, created_at, updated_at")
+      .eq("user_id", user.id)
       .order("updated_at", { ascending: false })
 
     if (error) {

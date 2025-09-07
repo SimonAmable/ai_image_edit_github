@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useRef, useEffect, useState, useCallback } from "react"
+import { apiUpload } from "@/app/utils/api-client"
 
 interface CropToolProps {
     imageUrl: string
@@ -152,14 +153,7 @@ export function CropTool({ imageUrl, imageWidth, imageHeight, onCropComplete, on
                 const formData = new FormData()
                 formData.append("file", blob, `cropped-${Date.now()}.png`)
 
-                const response = await fetch("/api/upload", {
-                    method: "POST",
-                    body: formData,
-                })
-
-                if (!response.ok) throw new Error("Failed to upload cropped image")
-
-                const result = await response.json()
+                const result = await apiUpload("/api/upload", formData)
 
                 // Return the cropped image data
                 onCropComplete({
